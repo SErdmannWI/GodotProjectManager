@@ -1,0 +1,85 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.3.2'
+	id 'io.spring.dependency-management' version '1.1.6'
+	id 'jacoco'
+}
+
+group = 'com.potatobuddy'
+version = '0.0.1-SNAPSHOT'
+
+jacoco {
+	toolVersion = '0.8.11'
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'com.mysql:mysql-connector-j:8.4.0'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+	testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.testcontainers:testcontainers:1.19.8'
+	testImplementation 'org.testcontainers:junit-jupiter:1.19.8'
+	testImplementation 'org.testcontainers:mysql:1.19.8'
+}
+
+sourceSets {
+	integrationTest {
+		java {
+			srcDir 'src/integrationTest/java'
+		}
+		resources {
+			srcDir 'src/integrationTest/resources'
+		}
+		compileClasspath += sourceSets.main.output + sourceSets.test.output
+		runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+
+	finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+
+	reports {
+		xml.required = true
+		csv.required = false
+		html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
+	}
+}
+
+
+configurations {
+	integrationTestImplementation.extendsFrom testImplementation
+	integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+task integrationTest(type: Test) {
+	testClassesDirs = sourceSets.integrationTest.output.classesDirs
+	classpath = sourceSets.integrationTest.runtimeClasspath
+	shouldRunAfter test // Ensure that unit tests run before integration tests
+	useJUnitPlatform()
+	// Specify test pattern to ensure that Gradle finds the tests
+	include '**/*Tests.class'
+}
