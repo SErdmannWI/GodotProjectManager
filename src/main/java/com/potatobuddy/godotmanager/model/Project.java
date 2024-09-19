@@ -21,6 +21,8 @@ public class Project {
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference
     private List<Task> tasks;
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<Task> backlog;
 
     public Project() {}
 
@@ -29,6 +31,7 @@ public class Project {
         this.name = builder.name;
         this.description = builder.description;
         this.tasks = builder.tasks != null ? builder.tasks : new ArrayList<>();
+        this.backlog = builder.backlog != null ? builder.backlog : new ArrayList<>();
     }
 
     public void addTask(Task task) {
@@ -38,6 +41,16 @@ public class Project {
 
     public void removeTask(Task task) {
         tasks.remove(task);
+        task.setProject(null);
+    }
+
+    public void addBacklog(Task task) {
+        backlog.add(task);
+        task.setProject(this);
+    }
+
+    public void removeBacklog(Task task) {
+        backlog.remove(task);
         task.setProject(null);
     }
 
@@ -73,6 +86,14 @@ public class Project {
         this.tasks = tasks;
     }
 
+    public List<Task> getBacklog() {
+        return backlog;
+    }
+
+    public void setBacklog(List<Task> backlog) {
+        this.backlog = backlog;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -93,6 +114,7 @@ public class Project {
         private String name;
         private String description;
         private List<Task> tasks;
+        private List<Task> backlog;
 
         public Builder withId(String id) {
             this.id = id;
@@ -111,6 +133,11 @@ public class Project {
 
         public Builder withTasks(List<Task> tasks) {
             this.tasks = tasks;
+            return this;
+        }
+
+        public Builder withBacklog(List<Task> backlog) {
+            this.backlog = backlog;
             return this;
         }
 

@@ -25,6 +25,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -205,6 +206,7 @@ public class ProjectControllerTests {
         updateProjectRequest.setName(TEST_PROJECT_NAME);
         updateProjectRequest.setDescription(TEST_PROJECT_DESCRIPTION);
         updateProjectRequest.setTasks(List.of(TEST_TASK));
+        updateProjectRequest.setBacklog(new ArrayList<>());
 
 
         // THEN
@@ -222,6 +224,7 @@ public class ProjectControllerTests {
         updateProjectRequest2.setName(TEST_PROJECT_NAME);
         updateProjectRequest2.setDescription(TEST_PROJECT_DESCRIPTION);
         updateProjectRequest2.setTasks(List.of(TEST_TASK, task1));
+        updateProjectRequest2.setBacklog(new ArrayList<>());
 
 
         // THEN
@@ -238,5 +241,112 @@ public class ProjectControllerTests {
             .andExpect(jsonPath("project_tasks[1].subtasks[0].name").value("Test Subtask 1"))
             .andExpect(jsonPath("project_tasks[1].subtasks[1].id").isString())
             .andExpect(jsonPath("project_tasks[1].subtasks[1].name").value("Test Subtask 2"));
+    }
+
+    @Test
+    @Transactional
+    public void updateProject_validRequestWithBacklogTasks_updatesProject() throws Exception {
+        // GIVEN
+        NewProjectRequest newProjectRequest = new NewProjectRequest();
+        newProjectRequest.setName(TEST_PROJECT_NAME);
+        newProjectRequest.setDescription(TEST_PROJECT_DESCRIPTION);
+
+        MvcResult result = mockMvc.perform(post(CREATE_PROJECT_ENDPOINT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(newProjectRequest)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String responseJson = result.getResponse().getContentAsString();
+        String projectId = JsonPath.parse(responseJson).read("$.project_id");
+
+        // WHEN
+        Task task1 = new Task.Builder()
+            .withName("Test Task 1")
+            .withDescription("Test Description")
+            .withDueDate(LocalDate.now())
+            .withDifficulty("M")
+            .withStatus("In Progress")
+            .withProject(null)
+            .build();
+
+        Subtask subtask1 = new Subtask.Builder()
+            .withName("Test Subtask 1")
+            .withDescription("Test Description")
+            .withDueDate(LocalDate.now())
+            .withDifficulty("M")
+            .withStatus("In Progress")
+            .withTask(null)
+            .build();
+
+        Subtask subtask2 = new Subtask.Builder()
+            .withName("Test Subtask 2")
+            .withDescription("Test Description")
+            .withDueDate(LocalDate.now())
+            .withDifficulty("M")
+            .withStatus("In Progress")
+            .withTask(null)
+            .build();
+
+        task1.addSubtask(subtask1);
+        task1.addSubtask(subtask2);
+
+        UpdateProjectRequest updateProjectRequest = new UpdateProjectRequest();
+        updateProjectRequest.setId(projectId);
+        updateProjectRequest.setName(TEST_PROJECT_NAME);
+        updateProjectRequest.setDescription(TEST_PROJECT_DESCRIPTION);
+        updateProjectRequest.setTasks(List.of(TEST_TASK));
+        updateProjectRequest.setBacklog(new ArrayList<>());
+
+
+        // THEN
+        mockMvc.perform(put(UPDATE_PROJECT_ENDPOINT + projectId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateProjectRequest)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("project_id").value(projectId))
+            .andExpect(jsonPath("project_name").value(TEST_PROJECT_NAME))
+            .andExpect(jsonPath("project_description").value(TEST_PROJECT_DESCRIPTION))
+            .andExpect(jsonPath("project_tasks[0].name").value(TEST_TASK.getName()));
+
+        UpdateProjectRequest updateProjectRequest2 = new UpdateProjectRequest();
+        updateProjectRequest2.setId(projectId);
+        updateProjectRequest2.setName(TEST_PROJECT_NAME);
+        updateProjectRequest2.setDescription(TEST_PROJECT_DESCRIPTION);
+        updateProjectRequest2.setTasks(List.of(TEST_TASK, task1));
+        updateProjectRequest2.setBacklog(new ArrayList<>());
+
+
+        // THEN
+        mockMvc.perform(put(UPDATE_PROJECT_ENDPOINT + projectId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateProjectRequest2)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("project_id").value(projectId))
+            .andExpect(jsonPath("project_name").value(TEST_PROJECT_NAME))
+            .andExpect(jsonPath("project_description").value(TEST_PROJECT_DESCRIPTION))
+            .andExpect(jsonPath("project_tasks[1].name").value(TEST_TASK.getName()))
+            .andExpect(jsonPath("project_tasks[1].subtasks").isArray())
+            .andExpect(jsonPath("project_tasks[1].subtasks[0].id").isString())
+            .andExpect(jsonPath("project_tasks[1].subtasks[0].name").value("Test Subtask 1"))
+            .andExpect(jsonPath("project_tasks[1].subtasks[1].id").isString())
+            .andExpect(jsonPath("project_tasks[1].subtasks[1].name").value("Test Subtask 2"));
+
+        UpdateProjectRequest updateProjectRequestWithBacklog = new UpdateProjectRequest();
+        updateProjectRequestWithBacklog.setId(projectId);
+        updateProjectRequestWithBacklog.setName(TEST_PROJECT_NAME);
+        updateProjectRequestWithBacklog.setDescription(TEST_PROJECT_DESCRIPTION);
+        updateProjectRequestWithBacklog.setTasks(new ArrayList<>());
+        updateProjectRequestWithBacklog.setBacklog(List.of(TEST_TASK));
+
+        mockMvc.perform(put(UPDATE_PROJECT_ENDPOINT + projectId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateProjectRequestWithBacklog)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("project_id").value(projectId))
+            .andExpect(jsonPath("project_name").value(TEST_PROJECT_NAME))
+            .andExpect(jsonPath("project_description").value(TEST_PROJECT_DESCRIPTION))
+            .andExpect(jsonPath("project_tasks").isArray())
+            .andExpect(jsonPath("project_backlog[0].name").value(TEST_TASK.getName()));
     }
 }

@@ -8,7 +8,6 @@ import java.util.List;
 
 public class UpdateProjectRequest {
     @JsonProperty("project_id")
-//    @NotNull(message = "Project id cannot be null")
     private String id;
     @JsonProperty("project_name")
     @NotNull(message = "Project name cannot be null")
@@ -18,6 +17,8 @@ public class UpdateProjectRequest {
     private String description;
     @JsonProperty("project_tasks")
     private List<Task> tasks;
+    @JsonProperty("project_backlog")
+    private List<Task> backlog;
 
     public @NotNull(message = "Project name cannot be null") String getName() {
         return name;
@@ -26,10 +27,6 @@ public class UpdateProjectRequest {
     public void setName(@NotNull(message = "Project name cannot be null") String name) {
         this.name = name;
     }
-
-//    public @NotNull(message = "Project id cannot be null") String getId() {
-//        return id;
-//    }
 
     public String getId() {
         return id;
@@ -53,6 +50,14 @@ public class UpdateProjectRequest {
 
     public void setTasks(List<Task> tasks) {
         this.tasks = tasks;
+    }
+
+    public List<Task> getBacklog() {
+        return backlog;
+    }
+
+    public void setBacklog(List<Task> backlog) {
+        this.backlog = backlog;
     }
 
     @Override

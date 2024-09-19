@@ -122,6 +122,14 @@ public class ProjectService {
             projectToUpdate.addTask(incomingTask);
         }
 
+        // Clear existing backlog (if necessary) and add updated backlog
+        projectToUpdate.getBacklog().clear();
+
+        for (Task backlogTask : updateProjectRequest.getBacklog()) {
+            // Add the backlog task to the project
+            projectToUpdate.addBacklog(backlogTask);
+        }
+
         // Save the updated project and return the response
         Project savedProject = projectRepository.save(projectToUpdate);
 
@@ -136,6 +144,7 @@ public class ProjectService {
             .withName(project.getName())
             .withDescription(project.getDescription())
             .withTasks(project.getTasks())
+            .withBacklog(project.getBacklog())
             .build();
     }
 
