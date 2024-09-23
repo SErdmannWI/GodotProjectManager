@@ -2,12 +2,14 @@ package com.potatobuddy.godotmanager.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDate;
+import java.util.Objects;
 
 @Entity
 @Table(name = "tasks")
@@ -26,6 +28,9 @@ public class Task {
     private LocalDate dueDate;
     @Column(name = "task_difficulty")
     private String difficulty;
+    @Column(name= "task_type")
+    @JsonProperty("task_type")
+    private String taskType;
     @ManyToOne
     @JoinColumn(name = "project_id")
     @JsonBackReference
@@ -43,6 +48,7 @@ public class Task {
         this.status = builder.status;
         this.dueDate = builder.dueDate;
         this.difficulty = builder.difficulty;
+        this.taskType = builder.taskType;
         this.project = builder.project;
         this.subtasks = builder.subtasks != null ? builder.subtasks : new ArrayList<>();
     }
@@ -62,6 +68,14 @@ public class Task {
 
     public void removeSubtask(Subtask subtask) {
         subtasks.remove(subtask);
+    }
+
+    public String getTaskType() {
+        return taskType;
+    }
+
+    public void setTaskType(String taskType) {
+        this.taskType = taskType;
     }
 
     public String getId() {
@@ -101,9 +115,7 @@ public class Task {
     }
 
     public void setDueDate(String dueDate) {
-        //Convert to Date
-        LocalDate date = LocalDate.parse(dueDate, DateTimeFormatter.ISO_DATE);
-        this.dueDate = date;
+        this.dueDate = LocalDate.parse(dueDate, DateTimeFormatter.ISO_DATE);
     }
 
     public String getDifficulty() {
@@ -131,6 +143,7 @@ public class Task {
         private String status;
         private LocalDate dueDate;
         private String difficulty;
+        private String taskType;
         private Project project;
         private List<Subtask> subtasks;
 
@@ -164,6 +177,11 @@ public class Task {
             return this;
         }
 
+        public Builder withTaskType(String taskType) {
+            this.taskType = taskType;
+            return this;
+        }
+
         public Builder withProject(Project project) {
             this.project = project;
             return this;
@@ -179,4 +197,16 @@ public class Task {
         }
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Task task = (Task) o;
+        return Objects.equals(id, task.id) && Objects.equals(name, task.name) && Objects.equals(description, task.description) && Objects.equals(status, task.status) && Objects.equals(dueDate, task.dueDate) && Objects.equals(difficulty, task.difficulty) && Objects.equals(project, task.project) && Objects.equals(subtasks, task.subtasks);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name, description, status, dueDate, difficulty, project, subtasks);
+    }
 }

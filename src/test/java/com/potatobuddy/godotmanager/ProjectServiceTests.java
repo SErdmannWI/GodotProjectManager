@@ -4,6 +4,7 @@ import com.potatobuddy.godotmanager.dto.project.ProjectResponse;
 import com.potatobuddy.godotmanager.dto.project.UpdateProjectRequest;
 import com.potatobuddy.godotmanager.exceptions.InvalidProjectRequestException;
 import com.potatobuddy.godotmanager.exceptions.ProjectNotFoundException;
+import com.potatobuddy.godotmanager.model.Constants;
 import com.potatobuddy.godotmanager.model.Project;
 import com.potatobuddy.godotmanager.model.Subtask;
 import com.potatobuddy.godotmanager.model.Task;
@@ -67,12 +68,14 @@ public class ProjectServiceTests {
         project2.setName(testName2);
         project2.setDescription(testDescription);
         project2.setTasks(new ArrayList<>());
+        project2.setTasks(new ArrayList<>());
 
         projectNoTasks = new Project.Builder()
             .withId(testIdNoTasks)
             .withDescription(testDescription)
             .withName(testNameNoTasks)
             .withTasks(new ArrayList<>())
+            .withBacklog(new ArrayList<>())
             .build();
     }
 
@@ -319,6 +322,9 @@ public class ProjectServiceTests {
             .withTasks(updateProjectRequest.getTasks())
             .build();
 
+        updatedProject.getTasks()
+            .forEach(task -> task.setProject(updatedProject));
+
         when(projectRepository.findById(testIdWithTasks)).thenReturn(Optional.ofNullable(oldProject));
         when(projectRepository.save(any())).thenReturn(updatedProject);
 
@@ -365,6 +371,9 @@ public class ProjectServiceTests {
 
             Assertions.assertEquals(requestTask.getDifficulty(), capturedTask.getDifficulty());
             Assertions.assertEquals(requestTask.getDifficulty(), responseTask.getDifficulty());
+
+            Assertions.assertEquals(requestTask.getTaskType(), capturedTask.getTaskType());
+            Assertions.assertEquals(requestTask.getTaskType(), responseTask.getTaskType());
 
             // Check the subtasks for this task
             Assertions.assertEquals(requestTask.getSubtasks().size(), capturedTask.getSubtasks().size());
@@ -470,6 +479,9 @@ public class ProjectServiceTests {
             Assertions.assertEquals(requestTask.getDifficulty(), capturedTask.getDifficulty());
             Assertions.assertEquals(requestTask.getDifficulty(), responseTask.getDifficulty());
 
+            Assertions.assertEquals(requestTask.getTaskType(), capturedTask.getTaskType());
+            Assertions.assertEquals(requestTask.getTaskType(), responseTask.getTaskType());
+
             // Check the subtasks for this task
             Assertions.assertEquals(requestTask.getSubtasks().size(), capturedTask.getSubtasks().size());
             Assertions.assertEquals(requestTask.getSubtasks().size(), responseTask.getSubtasks().size());
@@ -499,6 +511,140 @@ public class ProjectServiceTests {
                 Assertions.assertEquals(requestSubtask.getDifficulty(), capturedSubtask.getDifficulty());
                 Assertions.assertEquals(requestSubtask.getDifficulty(), responseSubtask.getDifficulty());
             }
+        }
+    }
+
+    @Test
+    public void testUpdateProject_validProjectWithBacklogExistingIds_updatesProject() {
+        // GIVEN
+        ArgumentCaptor<Project> projectArgumentCaptor = ArgumentCaptor.forClass(Project.class);
+
+        List<Task> originalTasks = getTasksWithId();
+        List<Task> backlogTasks = originalTasks.stream()
+            .map(task -> {
+                Task newTask = new Task.Builder()
+                    .withId(task.getId())
+                    .withName(task.getName())
+                    .withDescription(task.getDescription())
+                    .withDueDate(task.getDueDate())
+                    .withDifficulty(task.getDifficulty())
+                    .withProject(task.getProject())
+                    .withSubtasks(task.getSubtasks())
+                    .build();
+
+                newTask.setTaskType(Constants.TASK_TYPE_BACKLOG);
+                return newTask;
+            })
+            .toList();
+
+        List<Task> listWithBacklog = getNoIdTasks();
+        listWithBacklog.addAll(backlogTasks);
+
+        UpdateProjectRequest updateProjectRequest = new UpdateProjectRequest();
+        updateProjectRequest.setId(testIdWithTasks);
+        updateProjectRequest.setName(testNameWithTasks);
+        updateProjectRequest.setDescription(testDescription);
+        updateProjectRequest.setTasks(listWithBacklog);
+
+        Project oldProject = new Project.Builder()
+            .withName(testNameWithTasks)
+            .withId(testIdWithTasks)
+            .withDescription(testDescription)
+            .withTasks(originalTasks)
+            .build();
+
+        Project updatedProject = new Project.Builder()
+            .withName(testNameWithTasks)
+            .withId(testIdWithTasks)
+            .withDescription(testDescription)
+            .withTasks(updateProjectRequest.getTasks())
+            .build();
+
+        // WHEN
+        when(projectRepository.findById(testIdWithTasks)).thenReturn(Optional.of(oldProject));
+        when(projectRepository.save(any())).thenReturn(updatedProject);
+
+        projectService.updateProject(updateProjectRequest);
+
+        verify(projectRepository).save(projectArgumentCaptor.capture());
+        Project capturedProject = projectArgumentCaptor.getValue();
+
+        // THEN
+        Assertions.assertEquals(oldProject.getName(), updatedProject.getName());
+        Assertions.assertEquals(oldProject.getName(), capturedProject.getName());
+        Assertions.assertEquals(oldProject.getId(), updatedProject.getId());
+        Assertions.assertEquals(oldProject.getId(), capturedProject.getId());
+        Assertions.assertEquals(oldProject.getDescription(), updatedProject.getDescription());
+        Assertions.assertEquals(oldProject.getDescription(), capturedProject.getDescription());
+
+        // Check Tasks
+        for (int i = 0; i < updateProjectRequest.getTasks().size(); i++) {
+            Task newTask = updateProjectRequest.getTasks().get(i);
+            Task capturedTask = capturedProject.getTasks().get(i);
+            Task returnedTask = updatedProject.getTasks().get(i);
+
+            Assertions.assertEquals(newTask, capturedTask);
+            Assertions.assertEquals(newTask, returnedTask);
+        }
+    }
+
+    @Test
+    public void testUpdateProject_validProjectWithBacklogWithoutIds_updatesProject() {
+        // GIVEN
+        ArgumentCaptor<Project> projectArgumentCaptor = ArgumentCaptor.forClass(Project.class);
+
+        List<Task> originalTasks = getTasksWithId();
+        originalTasks.addAll(getNoIdBacklogTasks());
+
+        UpdateProjectRequest updateProjectRequest = new UpdateProjectRequest();
+        updateProjectRequest.setId(testIdWithTasks);
+        updateProjectRequest.setName(testNameWithTasks);
+        updateProjectRequest.setDescription(testDescription);
+        updateProjectRequest.setTasks(originalTasks);
+
+        Project oldProject = new Project.Builder()
+            .withName(testNameWithTasks)
+            .withId(testIdWithTasks)
+            .withDescription(testDescription)
+            .withTasks(originalTasks)
+            .withBacklog(new ArrayList<>())
+            .build();
+
+        Project updatedProject = new Project.Builder()
+            .withName(testNameWithTasks)
+            .withId(testIdWithTasks)
+            .withDescription(testDescription)
+            .withTasks(updateProjectRequest.getTasks())
+            .build();
+
+        // WHEN
+        when(projectRepository.findById(testIdWithTasks)).thenReturn(Optional.of(oldProject));
+        when(projectRepository.save(any())).thenReturn(updatedProject);
+
+        projectService.updateProject(updateProjectRequest);
+
+        verify(projectRepository).save(projectArgumentCaptor.capture());
+        Project capturedProject = projectArgumentCaptor.getValue();
+
+        // THEN
+        Assertions.assertEquals(oldProject.getName(), updatedProject.getName());
+        Assertions.assertEquals(oldProject.getName(), capturedProject.getName());
+        Assertions.assertEquals(oldProject.getId(), updatedProject.getId());
+        Assertions.assertEquals(oldProject.getId(), capturedProject.getId());
+        Assertions.assertEquals(oldProject.getDescription(), updatedProject.getDescription());
+        Assertions.assertEquals(oldProject.getDescription(), capturedProject.getDescription());
+
+        // Check Tasks
+        for (int i = 0; i < updateProjectRequest.getTasks().size(); i++) {
+            Task newTask = updateProjectRequest.getTasks().get(i);
+            Task capturedTask = capturedProject.getTasks().get(i);
+            Task returnedTask = updatedProject.getTasks().get(i);
+
+            Assertions.assertEquals(Constants.TASK_TYPE_BACKLOG, capturedTask.getTaskType());
+
+            Assertions.assertEquals(newTask, capturedTask);
+            Assertions.assertEquals(newTask, returnedTask);
+
         }
     }
 
@@ -758,6 +904,7 @@ public class ProjectServiceTests {
                 .withStatus(task1Status)
                 .withDueDate(task1DueDate)
                 .withDifficulty(task1Difficulty)
+                .withTaskType(Constants.TASK_TYPE_ACTIVE)
                 .withSubtasks(task1Subtasks)
                 .withId(null)
                 .build();
@@ -768,6 +915,7 @@ public class ProjectServiceTests {
                 .withStatus(task2Status)
                 .withDueDate(task2DueDate)
                 .withDifficulty(task2Difficulty)
+                .withTaskType(Constants.TASK_TYPE_ACTIVE)
                 .withSubtasks(task2Subtasks)
                 .withId("")
                 .build();
@@ -778,6 +926,7 @@ public class ProjectServiceTests {
                 .withStatus(task3Status)
                 .withDueDate(task3DueDate)
                 .withDifficulty(task3Difficulty)
+                .withTaskType(Constants.TASK_TYPE_ACTIVE)
                 .build();
 
         List<Task> noIdTasks = new ArrayList<>();
@@ -877,6 +1026,7 @@ public class ProjectServiceTests {
             .withStatus(task1Status)
             .withDueDate(task1DueDate)
             .withDifficulty(task1Difficulty)
+            .withTaskType(Constants.TASK_TYPE_ACTIVE)
             .withSubtasks(task1Subtasks)
             .withId(task1Id)
             .build();
@@ -887,6 +1037,7 @@ public class ProjectServiceTests {
             .withStatus(task2Status)
             .withDueDate(task2DueDate)
             .withDifficulty(task2Difficulty)
+            .withTaskType(Constants.TASK_TYPE_ACTIVE)
             .withSubtasks(task2Subtasks)
             .withId(task2Id)
             .build();
@@ -897,6 +1048,231 @@ public class ProjectServiceTests {
             .withStatus(task3Status)
             .withDueDate(task3DueDate)
             .withDifficulty(task3Difficulty)
+            .withTaskType(Constants.TASK_TYPE_ACTIVE)
+            .withId(task3Id)
+            .build();
+
+        List<Task> tasksWithId = new ArrayList<>();
+        tasksWithId.add(testTask1);
+        tasksWithId.add(testTask2);
+        tasksWithId.add(testTask3);
+
+        return tasksWithId;
+    }
+
+    private List<Task> getNoIdBacklogTasks() {
+        String task1Name = "Test Task 1";
+        String task2Name = "Test Task 2";
+        String task3Name = "Test Task 3";
+        String task1description = "Test Description 1";
+        String task2description = "Test Description 2";
+        String task3description = "Test Description 3";
+        String task1Status = "Not Started";
+        String task2Status = "In Progress";
+        String task3Status = "Completed";
+        LocalDate task1DueDate = LocalDate.parse("2022-01-01");
+        LocalDate task2DueDate = LocalDate.parse("2022-01-02");
+        LocalDate task3DueDate = LocalDate.parse("2022-01-03");
+        String task1Difficulty = "S";
+        String task2Difficulty = "M";
+        String task3Difficulty = "XL";
+
+        String task1Subtask1Name = "Test Subtask 1";
+        String task1Subtask2Name = "Test Subtask 2";
+        String task2Subtask1Name = "Test Subtask 3";
+        String task1Subtask1Id = UUID.randomUUID().toString();
+        String task1Subtask2Id = UUID.randomUUID().toString();
+        String task2Subtask1Id = UUID.randomUUID().toString();
+        String task1Subtask1Description = "Test Subtask Description 1";
+        String task1Subtask2Description = "Test Subtask Description 2";
+        String task2Subtask1Description = "Test Subtask Description 3";
+        String task1Subtask1Status = "Not Started";
+        String task1Subtask2Status = "In Progress";
+        String task2Subtask1Status = "Completed";
+        LocalDate task1Subtask1DueDate = LocalDate.parse("2022-01-01");
+        LocalDate task1Subtask2DueDate = LocalDate.parse("2022-01-02");
+        LocalDate task2Subtask1DueDate = LocalDate.parse("2022-01-03");
+        String task1Subtask1Difficulty = "S";
+        String task1Subtask2Difficulty = "M";
+        String task2Subtask1Difficulty = "XL";
+
+        // Create Subtasks and add to Lists
+        Subtask task1Subtask1 = new Subtask.Builder()
+            .withName(task1Subtask1Name)
+            .withDescription(task1Subtask1Description)
+            .withStatus(task1Subtask1Status)
+            .withDueDate(task1Subtask1DueDate)
+            .withDifficulty(task1Subtask1Difficulty)
+            .withId(task1Subtask1Id)
+            .build();
+
+        Subtask task1Subtask2 = new Subtask.Builder()
+            .withName(task1Subtask2Name)
+            .withDescription(task1Subtask2Description)
+            .withStatus(task1Subtask2Status)
+            .withDueDate(task1Subtask2DueDate)
+            .withDifficulty(task1Subtask2Difficulty)
+            .withId(task1Subtask2Id)
+            .build();
+
+        Subtask task2Subtask1 = new Subtask.Builder()
+            .withName(task2Subtask1Name)
+            .withDescription(task2Subtask1Description)
+            .withStatus(task2Subtask1Status)
+            .withDueDate(task2Subtask1DueDate)
+            .withDifficulty(task2Subtask1Difficulty)
+            .withId(task2Subtask1Id)
+            .build();
+
+        List<Subtask> task1Subtasks = new ArrayList<>();
+        task1Subtasks.add(task1Subtask1);
+        task1Subtasks.add(task1Subtask2);
+
+        List<Subtask> task2Subtasks = new ArrayList<>();
+        task2Subtasks.add(task2Subtask1);
+
+        // Create Tasks, add subtasks to Tasks 1 and 2, and add Tasks to List
+        Task testTask1 = new Task.Builder()
+            .withName(task1Name)
+            .withDescription(task1description)
+            .withStatus(task1Status)
+            .withDueDate(task1DueDate)
+            .withDifficulty(task1Difficulty)
+            .withTaskType(Constants.TASK_TYPE_BACKLOG)
+            .withSubtasks(task1Subtasks)
+            .build();
+
+        Task testTask2 = new Task.Builder()
+            .withName(task2Name)
+            .withDescription(task2description)
+            .withStatus(task2Status)
+            .withDueDate(task2DueDate)
+            .withDifficulty(task2Difficulty)
+            .withTaskType(Constants.TASK_TYPE_BACKLOG)
+            .withSubtasks(task2Subtasks)
+            .build();
+
+        Task testTask3 = new Task.Builder()
+            .withName(task3Name)
+            .withDescription(task3description)
+            .withStatus(task3Status)
+            .withDueDate(task3DueDate)
+            .withDifficulty(task3Difficulty)
+            .withTaskType(Constants.TASK_TYPE_BACKLOG)
+            .build();
+
+        List<Task> tasksWithId = new ArrayList<>();
+        tasksWithId.add(testTask1);
+        tasksWithId.add(testTask2);
+        tasksWithId.add(testTask3);
+
+        return tasksWithId;
+    }
+
+    private List<Task> getBacklogTasksWithId() {
+        String task1Name = "Test Task 1";
+        String task2Name = "Test Task 2";
+        String task3Name = "Test Task 3";
+        String task1Id = UUID.randomUUID().toString();
+        String task2Id = UUID.randomUUID().toString();
+        String task3Id = UUID.randomUUID().toString();
+        String task1description = "Test Description 1";
+        String task2description = "Test Description 2";
+        String task3description = "Test Description 3";
+        String task1Status = "Not Started";
+        String task2Status = "In Progress";
+        String task3Status = "Completed";
+        LocalDate task1DueDate = LocalDate.parse("2022-01-01");
+        LocalDate task2DueDate = LocalDate.parse("2022-01-02");
+        LocalDate task3DueDate = LocalDate.parse("2022-01-03");
+        String task1Difficulty = "S";
+        String task2Difficulty = "M";
+        String task3Difficulty = "XL";
+
+        String task1Subtask1Name = "Test Subtask 1";
+        String task1Subtask2Name = "Test Subtask 2";
+        String task2Subtask1Name = "Test Subtask 3";
+        String task1Subtask1Id = UUID.randomUUID().toString();
+        String task1Subtask2Id = UUID.randomUUID().toString();
+        String task2Subtask1Id = UUID.randomUUID().toString();
+        String task1Subtask1Description = "Test Subtask Description 1";
+        String task1Subtask2Description = "Test Subtask Description 2";
+        String task2Subtask1Description = "Test Subtask Description 3";
+        String task1Subtask1Status = "Not Started";
+        String task1Subtask2Status = "In Progress";
+        String task2Subtask1Status = "Completed";
+        LocalDate task1Subtask1DueDate = LocalDate.parse("2022-01-01");
+        LocalDate task1Subtask2DueDate = LocalDate.parse("2022-01-02");
+        LocalDate task2Subtask1DueDate = LocalDate.parse("2022-01-03");
+        String task1Subtask1Difficulty = "S";
+        String task1Subtask2Difficulty = "M";
+        String task2Subtask1Difficulty = "XL";
+
+        // Create Subtasks and add to Lists
+        Subtask task1Subtask1 = new Subtask.Builder()
+            .withName(task1Subtask1Name)
+            .withDescription(task1Subtask1Description)
+            .withStatus(task1Subtask1Status)
+            .withDueDate(task1Subtask1DueDate)
+            .withDifficulty(task1Subtask1Difficulty)
+            .withId(task1Subtask1Id)
+            .build();
+
+        Subtask task1Subtask2 = new Subtask.Builder()
+            .withName(task1Subtask2Name)
+            .withDescription(task1Subtask2Description)
+            .withStatus(task1Subtask2Status)
+            .withDueDate(task1Subtask2DueDate)
+            .withDifficulty(task1Subtask2Difficulty)
+            .withId(task1Subtask2Id)
+            .build();
+
+        Subtask task2Subtask1 = new Subtask.Builder()
+            .withName(task2Subtask1Name)
+            .withDescription(task2Subtask1Description)
+            .withStatus(task2Subtask1Status)
+            .withDueDate(task2Subtask1DueDate)
+            .withDifficulty(task2Subtask1Difficulty)
+            .withId(task2Subtask1Id)
+            .build();
+
+        List<Subtask> task1Subtasks = new ArrayList<>();
+        task1Subtasks.add(task1Subtask1);
+        task1Subtasks.add(task1Subtask2);
+
+        List<Subtask> task2Subtasks = new ArrayList<>();
+        task2Subtasks.add(task2Subtask1);
+
+        // Create Tasks, add subtasks to Tasks 1 and 2, and add Tasks to List
+        Task testTask1 = new Task.Builder()
+            .withName(task1Name)
+            .withDescription(task1description)
+            .withStatus(task1Status)
+            .withDueDate(task1DueDate)
+            .withDifficulty(task1Difficulty)
+            .withTaskType(Constants.TASK_TYPE_BACKLOG)
+            .withSubtasks(task1Subtasks)
+            .withId(task1Id)
+            .build();
+
+        Task testTask2 = new Task.Builder()
+            .withName(task2Name)
+            .withDescription(task2description)
+            .withStatus(task2Status)
+            .withDueDate(task2DueDate)
+            .withDifficulty(task2Difficulty)
+            .withTaskType(Constants.TASK_TYPE_BACKLOG)
+            .withSubtasks(task2Subtasks)
+            .withId(task2Id)
+            .build();
+
+        Task testTask3 = new Task.Builder()
+            .withName(task3Name)
+            .withDescription(task3description)
+            .withStatus(task3Status)
+            .withDueDate(task3DueDate)
+            .withDifficulty(task3Difficulty)
+            .withTaskType(Constants.TASK_TYPE_BACKLOG)
             .withId(task3Id)
             .build();
 

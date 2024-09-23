@@ -3,6 +3,7 @@ package com.potatobuddy.godotmanager.service;
 import com.potatobuddy.godotmanager.dto.project.NewProjectRequest;
 import com.potatobuddy.godotmanager.dto.project.ProjectResponse;
 import com.potatobuddy.godotmanager.dto.project.UpdateProjectRequest;
+import com.potatobuddy.godotmanager.exceptions.DuplicateEntryException;
 import com.potatobuddy.godotmanager.exceptions.InvalidProjectRequestException;
 import com.potatobuddy.godotmanager.exceptions.ProjectNotFoundException;
 import com.potatobuddy.godotmanager.model.Project;
@@ -14,10 +15,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class ProjectService {
@@ -79,14 +77,15 @@ public class ProjectService {
     }
 
     public ProjectResponse updateProject(UpdateProjectRequest updateProjectRequest) {
+        // Null checks
         if (updateProjectRequest.getId() == null || updateProjectRequest.getId().isEmpty() || updateProjectRequest.getId().isBlank()) {
             throw new InvalidProjectRequestException("Project ID cannot be empty or null");
-        }
-        if (updateProjectRequest.getName() == null || updateProjectRequest.getName().isEmpty() || updateProjectRequest.getName().isBlank()) {
+        } else if (updateProjectRequest.getName() == null || updateProjectRequest.getName().isEmpty() || updateProjectRequest.getName().isBlank()) {
             throw new InvalidProjectRequestException("Project name cannot be empty or null");
         } else if (updateProjectRequest.getDescription() == null || updateProjectRequest.getDescription().isEmpty() || updateProjectRequest.getDescription().isBlank()) {
             throw new InvalidProjectRequestException("Project description cannot be empty or null");
         }
+
 
         // Fetch the project to update from the database
         Project projectToUpdate = projectRepository.findById(updateProjectRequest.getId())
@@ -95,6 +94,9 @@ public class ProjectService {
         // Update the project fields
         projectToUpdate.setName(updateProjectRequest.getName());
         projectToUpdate.setDescription(updateProjectRequest.getDescription());
+
+        // Map for checking Duplicates
+        List<String> ids = new ArrayList<>();
 
         // Clear existing tasks (if necessary) and add updated tasks
         projectToUpdate.getTasks().clear();
@@ -105,7 +107,16 @@ public class ProjectService {
                 assignTaskId(incomingTask);
             }
 
-            // Set the project relationship correctly for each task
+            // Check for duplicate entry
+            if (ids.contains(incomingTask.getId())) {
+                throw new DuplicateEntryException("Task with id: " + incomingTask.getId() + " and name "
+                    + incomingTask.getName() + " in project " + updateProjectRequest.getName()
+                    + " is duplicated between active and backlog tasks!");
+            } else {
+                ids.add(incomingTask.getId());
+            }
+
+            // Set the project relationship for each Task
             incomingTask.setProject(projectToUpdate);
 
             // Handle subtasks for each task

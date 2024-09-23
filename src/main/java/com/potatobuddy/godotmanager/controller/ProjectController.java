@@ -1,9 +1,13 @@
 package com.potatobuddy.godotmanager.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.potatobuddy.godotmanager.dto.project.NewProjectRequest;
 import com.potatobuddy.godotmanager.dto.project.ProjectResponse;
 import com.potatobuddy.godotmanager.dto.project.UpdateProjectRequest;
 import com.potatobuddy.godotmanager.service.ProjectService;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +21,13 @@ public class ProjectController {
 
     @Autowired
     private ProjectService projectService;
+    @Autowired
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    @PostConstruct
+    public void setup() {
+        objectMapper.registerModule(new JavaTimeModule());
+    }
 
     @GetMapping("/all")
     public ResponseEntity<List<ProjectResponse>> getAllProjects() {
@@ -40,7 +51,9 @@ public class ProjectController {
     }
 
     @PutMapping("/updateProject/{id}")
-    public ResponseEntity<ProjectResponse> updateProject(@PathVariable String id, @RequestBody UpdateProjectRequest updatedProjectRequest) {
+    public ResponseEntity<ProjectResponse> updateProject(@PathVariable String id, @RequestBody UpdateProjectRequest updatedProjectRequest) throws JsonProcessingException {
+        String requestJson = objectMapper.writeValueAsString(updatedProjectRequest);
+        System.out.println(requestJson);
         ProjectResponse project = projectService.updateProject(updatedProjectRequest);
         if (project != null) {
             return ResponseEntity.ok(project);

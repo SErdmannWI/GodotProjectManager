@@ -1,6 +1,7 @@
 package com.potatobuddy.godotmanager.model;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
@@ -13,13 +14,17 @@ public class Project {
 
     @Id
     @Column(name = "project_id")
+    @JsonProperty("project_id")
     private String id;
     @Column(name = "name")
+    @JsonProperty("project_name")
     private String name;
     @Column(name = "description")
+    @JsonProperty("project_description")
     private String description;
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference
+    @JsonProperty("project_tasks")
     private List<Task> tasks;
 
     public Project() {}
@@ -93,6 +98,7 @@ public class Project {
         private String name;
         private String description;
         private List<Task> tasks;
+        private List<Task> backlog;
 
         public Builder withId(String id) {
             this.id = id;
@@ -111,6 +117,11 @@ public class Project {
 
         public Builder withTasks(List<Task> tasks) {
             this.tasks = tasks;
+            return this;
+        }
+
+        public Builder withBacklog(List<Task> backlog) {
+            this.backlog = backlog;
             return this;
         }
 

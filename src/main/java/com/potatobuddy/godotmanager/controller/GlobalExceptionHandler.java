@@ -1,9 +1,6 @@
 package com.potatobuddy.godotmanager.controller;
 
-import com.potatobuddy.godotmanager.exceptions.ErrorResponse;
-import com.potatobuddy.godotmanager.exceptions.InvalidJournalEntryException;
-import com.potatobuddy.godotmanager.exceptions.InvalidProjectRequestException;
-import com.potatobuddy.godotmanager.exceptions.ProjectNotFoundException;
+import com.potatobuddy.godotmanager.exceptions.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +25,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(InvalidJournalEntryException.class)
     public ResponseEntity<ErrorResponse> handleInvalidJournalEntry(InvalidJournalEntryException ex) {
+        ErrorResponse errorResponse = new ErrorResponse(400, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body(errorResponse);
+    }
+
+    @ExceptionHandler(DuplicateEntryException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateEntryException(DuplicateEntryException ex) {
         ErrorResponse errorResponse = new ErrorResponse(400, ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body(errorResponse);
     }

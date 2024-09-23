@@ -8,7 +8,6 @@ import java.util.List;
 
 public class UpdateProjectRequest {
     @JsonProperty("project_id")
-//    @NotNull(message = "Project id cannot be null")
     private String id;
     @JsonProperty("project_name")
     @NotNull(message = "Project name cannot be null")
@@ -26,10 +25,6 @@ public class UpdateProjectRequest {
     public void setName(@NotNull(message = "Project name cannot be null") String name) {
         this.name = name;
     }
-
-//    public @NotNull(message = "Project id cannot be null") String getId() {
-//        return id;
-//    }
 
     public String getId() {
         return id;

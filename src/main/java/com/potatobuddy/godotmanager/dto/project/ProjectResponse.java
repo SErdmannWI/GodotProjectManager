@@ -25,7 +25,6 @@ public class ProjectResponse {
         this.tasks = builder.tasks;
     }
 
-
     public String getId() {
         return id;
     }
@@ -58,11 +57,13 @@ public class ProjectResponse {
         this.tasks = tasks;
     }
 
+
     public static class Builder{
         private String id;
         private String name;
         private String description;
         private List<Task> tasks;
+        private List<Task> backlog;
 
         public Builder withId(String id) {
             this.id = id;
@@ -81,6 +82,11 @@ public class ProjectResponse {
 
         public Builder withTasks(List<Task> tasks) {
             this.tasks = tasks;
+            return this;
+        }
+
+        public Builder withBacklog(List<Task> backlog){
+            this.backlog = backlog;
             return this;
         }
 
