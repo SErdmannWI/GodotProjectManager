@@ -17,8 +17,6 @@ public class UpdateProjectRequest {
     private String description;
     @JsonProperty("project_tasks")
     private List<Task> tasks;
-    @JsonProperty("project_backlog")
-    private List<Task> backlog;
 
     public @NotNull(message = "Project name cannot be null") String getName() {
         return name;
@@ -50,14 +48,6 @@ public class UpdateProjectRequest {
 
     public void setTasks(List<Task> tasks) {
         this.tasks = tasks;
-    }
-
-    public List<Task> getBacklog() {
-        return backlog;
-    }
-
-    public void setBacklog(List<Task> backlog) {
-        this.backlog = backlog;
     }
 
     @Override

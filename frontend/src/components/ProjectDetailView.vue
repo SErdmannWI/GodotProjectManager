@@ -3,7 +3,14 @@
     <div v-if="project">
       <h1>{{ project.project_name }}</h1>
       <p>{{ project.project_description }}</p>
-      <h2>Tasks</h2>
+
+      <!-- View Mode Toggle -->
+      <div class="view-mode-toggle">
+        <button @click="viewMode = 'active'" :class="{ active: viewMode === 'active' }">Active Tasks</button>
+        <button @click="viewMode = 'backlog'" :class="{ active: viewMode === 'backlog' }">Backlog</button>
+      </div>
+
+      <h2>{{ viewMode === 'active' ? 'Active Tasks' : 'Backlog' }}</h2>
 
       <add-task-form v-if="taskBeingEdited" :task="taskBeingEdited" @save-task="saveTaskEdit" class="add-task-form" />
       <add-task-form v-else @add-task="addTaskToProject" class="add-task-form" />
@@ -44,8 +51,9 @@
               @update:modelValue="(value) => updateTaskProperty(task, 'difficulty', value)"
             />
             <div class="task-actions">
-              <button @click="moveTaskUp(index)" :disabled="index === 0">↑</button>
-              <button @click="moveTaskDown(index)" :disabled="index === project.project_tasks.length - 1">↓</button>
+              <button @click="toggleTaskType(task)">
+                {{ viewMode === 'active' ? 'Move to Backlog' : 'Move to Active' }}
+              </button>
             </div>
           </div>
 
@@ -121,7 +129,6 @@ import AddTaskForm from './AddTaskForm.vue';
 import InlineEditPopover from './InlineEditPopover.vue';
 import ColoredStatusSelect from './ColoredStatusSelect.vue';
 import DifficultySelector from './DifficultySelector.vue';
-import { format, parse, addDays } from 'date-fns';
 import { debounce } from 'lodash';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { faCircle, faPencilAlt, faSpinner, faExclamationTriangle, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
@@ -154,6 +161,8 @@ export default defineComponent({
     const taskBeingEditedForSubtask = ref<Task | null>(null);
     const taskBeingEdited = ref<Task | null>(null);
 
+    const viewMode = ref<'active' | 'backlog'>('active');
+
     const subtaskName = ref('');
     const subtaskDescription = ref('');
     const subtaskDueDate = ref('');
@@ -164,6 +173,14 @@ export default defineComponent({
       try {
         const response = await projectApi.getProjectById(props.projectId);
         project.value = response.data;
+        // Ensure project_tasks is initialized as an array
+        project.value.project_tasks = project.value.project_tasks ?? [];
+
+        // Initialize task_type and subtasks for each task
+        project.value.project_tasks.forEach(task => {
+          task.task_type = task.task_type ?? 'active';
+          task.subtasks = task.subtasks ?? [];
+        });
       } catch (error) {
         console.error('Error fetching project:', error);
       }
@@ -175,44 +192,51 @@ export default defineComponent({
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     };
 
-    const sortedTasks = computed (() => {
+    const sortedTasks = computed(() => {
       if (!project.value) return [];
-      return [...project.value.project_tasks].sort(sortByDueDate);
+      const tasks = project.value.project_tasks ?? [];
+      const filteredTasks = tasks.filter(task => task.task_type === viewMode.value);
+      return [...filteredTasks].sort(sortByDueDate);
     });
 
     const debouncedUpdateProject = debounce(async () => {
       if (project.value) {
-        try {
-          const response = await projectApi.updateProject(props.projectId, {
-            project_id: project.value.project_id,
-            project_name: project.value.project_name,
-            project_description: project.value.project_description,
-            project_tasks: project.value.project_tasks
-          });
-          project.value = response.data;
-          updateTaskIds();
-        } catch (error) {
-          console.error('Error updating project:', error);
-        }
-      }
-    }, 500);
+        const projectTasks = project.value.project_tasks ?? [];
 
-    // Watch for changes in the project and update the backend
+      try {
+        const response = await projectApi.updateProject(props.projectId, {
+          project_id: project.value.project_id,
+          project_name: project.value.project_name,
+          project_description: project.value.project_description,
+          project_tasks: projectTasks,
+        });
+      project.value = response.data;
+      } catch (error) {
+        console.error('Error updating project:', error);
+      }
+  }
+}, 500);
+
     watch(() => project.value, debouncedUpdateProject, { deep: true });
 
-    // Fetch the project when the component is mounted
     fetchProject();
 
     const addTaskToProject = async (task: Omit<Task, 'id'>) => {
       if (project.value) {
-        const newTask: Task = { ...task, id: "", subtasks: [] };
-        if (!project.value.project_tasks.some(t => t.id === "")) {
-          project.value.project_tasks.push(newTask);
-          await debouncedUpdateProject();
-          updateTaskIds();
-        }
-      } else {
+        console.log("Current view mode: ", viewMode.value);
+        const newTask: Task = {
+          ...task,
+          id: '',
+          subtasks: [],
+          task_type: viewMode.value,
+        };
+        const taskList = project.value.project_tasks;
+        if (!taskList.some(t => t.id === '')) {
+          taskList.push(newTask);
+          console.log("New task added: ", newTask);
+        } else {
         console.error('Project is not initialized');
+        }
       }
     };
 
@@ -224,9 +248,12 @@ export default defineComponent({
 
     const deleteTask = async (task: Task) => {
       if (!project.value) return;
-      project.value.project_tasks = project.value.project_tasks.filter((t) => t.id !== task.id);
-      await debouncedUpdateProject();
-    }; 
+      const taskList = project.value.project_tasks;
+      const index = taskList.findIndex(t => t.id === task.id);
+      if (index !== -1) {
+        taskList.splice(index, 1);
+      }
+    };
 
     const confirmDeleteSubtask = (task: Task, subtask: Subtask) => {
       if (confirm(`Are you sure you want to delete the subtask "${subtask.name}"?`)) {
@@ -235,7 +262,7 @@ export default defineComponent({
     };
 
     const deleteSubtask = (task: Task, subtask: Subtask) => {
-      task.subtasks = task.subtasks.filter((s) => s.id !== subtask.id);
+      task.subtasks = task.subtasks.filter(s => s.id !== subtask.id);
     };
 
     const showSubtaskForm = (task: Task) => {
@@ -258,7 +285,7 @@ export default defineComponent({
         return;
       }
       const newSubtask: Subtask = {
-        id: "",
+        id: '',
         name: subtaskName.value.trim(),
         description: subtaskDescription.value,
         dueDate: subtaskDueDate.value,
@@ -266,8 +293,6 @@ export default defineComponent({
         difficulty: subtaskDifficulty.value,
       };
       task.subtasks.push(newSubtask);
-      await debouncedUpdateProject();
-      updateTaskIds();
       taskBeingEditedForSubtask.value = null;
       subtaskName.value = '';
       subtaskDescription.value = '';
@@ -277,12 +302,17 @@ export default defineComponent({
     };
 
     const updateTaskProperty = async (task: Task, property: keyof Task, value: string | number) => {
-      if (property === 'dueDate') {
-        task[property] = parseDate(value as string);
-      } else {
-        (task[property] as string | number) = value;
+      if (!project.value) return;
+      const tasks = project.value.project_tasks;
+      const taskIndex = tasks.findIndex(t => t.id === task.id);
+      if (taskIndex !== -1) {
+        const taskToUpdate = tasks[taskIndex];
+        if (property === 'dueDate') {
+          taskToUpdate[property] = parseDate(value as string);
+        } else {
+          (taskToUpdate[property] as string | number) = value;
+        }
       }
-      await debouncedUpdateProject();
     };
 
     const updateSubtaskProperty = async (task: Task, subtask: Subtask, property: keyof Subtask, value: string | number) => {
@@ -293,24 +323,8 @@ export default defineComponent({
         } else {
           (task.subtasks[subtaskIndex][property] as string | number) = value;
         }
-        await debouncedUpdateProject();
       }
     };
-
-    const updateTaskIds = () => {
-      if (project.value) {
-        project.value.project_tasks.forEach((task, index) => {
-          if (task.id === "") {
-            task.id = project.value!.project_tasks[index].id;
-          }
-          task.subtasks.forEach((subtask, subIndex) => {
-            if (subtask.id === "") {
-              subtask.id = project.value!.project_tasks[index].subtasks[subIndex].id;
-            }
-          });
-        });
-      }
-    }
 
     const saveTaskEdit = (editedTask: Task) => {
       if (taskBeingEdited.value) {
@@ -319,21 +333,12 @@ export default defineComponent({
       }
     };
 
-    const moveTaskUp = async (index: number) => {
-      if (project.value && index > 0) {
-        const tasks = [...project.value.project_tasks];
-        [tasks[index - 1], tasks[index]] = [tasks[index], tasks[index - 1]];
-        project.value.project_tasks = tasks;
-        await debouncedUpdateProject();
-      }
-    };
-
-    const moveTaskDown = async (index: number) => {
-      if (project.value && index < project.value.project_tasks.length - 1) {
-        const tasks = [...project.value.project_tasks];
-        [tasks[index], tasks[index + 1]] = [tasks[index + 1], tasks[index]];
-        project.value.project_tasks = tasks;
-        await debouncedUpdateProject();
+    const toggleTaskType = async (task: Task) => {
+      if (!project.value) return;
+      const tasks = project.value.project_tasks;
+      const taskIndex = tasks.findIndex(t => t.id === task.id);
+      if (taskIndex !== -1) {
+        tasks[taskIndex].task_type = task.task_type === 'active' ? 'backlog' : 'active';
       }
     };
 
@@ -349,18 +354,25 @@ export default defineComponent({
 
     const getStatusIcon = (status: string) => {
       switch (status) {
-        case 'Not Started': return faCircle;
-        case 'In Planning': return faPencilAlt;
-        case 'In Progress': return faSpinner;
-        case 'Needs Attention': return faExclamationTriangle;
-        case 'Finished': return faCheckCircle;
-        default: return faCircle;
+        case 'Not Started':
+          return faCircle;
+        case 'In Planning':
+          return faPencilAlt;
+        case 'In Progress':
+          return faSpinner;
+        case 'Needs Attention':
+          return faExclamationTriangle;
+        case 'Finished':
+          return faCheckCircle;
+        default:
+          return faCircle;
       }
     };
 
     return {
       project,
       taskBeingEditedForSubtask,
+      taskBeingEdited,
       subtaskName,
       subtaskDescription,
       subtaskDueDate,
@@ -376,22 +388,22 @@ export default defineComponent({
       addSubtaskToTask,
       updateTaskProperty,
       updateSubtaskProperty,
-      taskBeingEdited,
       saveTaskEdit,
+      toggleTaskType,
       statusOptions,
-      moveTaskUp,
-      moveTaskDown,
       formatDate,
       parseDate,
       getStatusIcon,
       sortedTasks,
       sortByDueDate,
+      viewMode,
     };
   },
 });
 </script>
 
 <style scoped>
+
 h1 {
   color: #2c3e50;
   text-align: center;
@@ -593,5 +605,24 @@ h2 {
   display: flex;
   align-items: center;
 }
-</style>
 
+/* Add styles for the view mode toggle */
+.view-mode-toggle {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.view-mode-toggle button {
+  padding: 10px 20px;
+  margin: 0 10px;
+  background-color: #3498db;
+  color: rgb(255, 255, 255);
+  border: none;
+  cursor: pointer;
+}
+
+.view-mode-toggle button.active {
+  background-color: #2980b9;
+}
+</style>

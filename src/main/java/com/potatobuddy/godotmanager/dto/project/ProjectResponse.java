@@ -15,8 +15,6 @@ public class ProjectResponse {
     private String description;
     @JsonProperty("project_tasks")
     private List<Task> tasks;
-    @JsonProperty("project_backlog")
-    private List<Task> backlog;
 
     public ProjectResponse() {}
 
@@ -25,7 +23,6 @@ public class ProjectResponse {
         this.name = builder.name;
         this.description = builder.description;
         this.tasks = builder.tasks;
-        this.backlog = builder.backlog;
     }
 
     public String getId() {
@@ -60,13 +57,6 @@ public class ProjectResponse {
         this.tasks = tasks;
     }
 
-    public List<Task> getBacklog() {
-        return backlog;
-    }
-
-    public void setBacklog(List<Task> backlog) {
-        this.backlog = backlog;
-    }
 
     public static class Builder{
         private String id;

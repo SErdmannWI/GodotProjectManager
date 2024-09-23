@@ -13,6 +13,7 @@ export interface Task {
   description: string;
   dueDate: string;
   status: string;
+  task_type: string;
   difficulty: string;
   subtasks: Subtask[];
 }

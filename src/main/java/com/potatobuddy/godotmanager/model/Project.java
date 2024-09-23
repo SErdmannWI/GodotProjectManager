@@ -1,6 +1,7 @@
 package com.potatobuddy.godotmanager.model;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
@@ -13,16 +14,18 @@ public class Project {
 
     @Id
     @Column(name = "project_id")
+    @JsonProperty("project_id")
     private String id;
     @Column(name = "name")
+    @JsonProperty("project_name")
     private String name;
     @Column(name = "description")
+    @JsonProperty("project_description")
     private String description;
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonManagedReference
+    @JsonProperty("project_tasks")
     private List<Task> tasks;
-    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-    private List<Task> backlog;
 
     public Project() {}
 
@@ -31,7 +34,6 @@ public class Project {
         this.name = builder.name;
         this.description = builder.description;
         this.tasks = builder.tasks != null ? builder.tasks : new ArrayList<>();
-        this.backlog = builder.backlog != null ? builder.backlog : new ArrayList<>();
     }
 
     public void addTask(Task task) {
@@ -41,16 +43,6 @@ public class Project {
 
     public void removeTask(Task task) {
         tasks.remove(task);
-        task.setProject(null);
-    }
-
-    public void addBacklog(Task task) {
-        backlog.add(task);
-        task.setProject(this);
-    }
-
-    public void removeBacklog(Task task) {
-        backlog.remove(task);
         task.setProject(null);
     }
 
@@ -84,14 +76,6 @@ public class Project {
 
     public void setTasks(List<Task> tasks) {
         this.tasks = tasks;
-    }
-
-    public List<Task> getBacklog() {
-        return backlog;
-    }
-
-    public void setBacklog(List<Task> backlog) {
-        this.backlog = backlog;
     }
 
     @Override
